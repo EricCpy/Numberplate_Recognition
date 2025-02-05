@@ -1,0 +1,6 @@
+path: D:/Zeug/Unizeug/Master_DataScience/3.Semester/Learning from Images/Project/
+train: ./data/merged/images/train
+val: ./data/merged/images/val
+test: ./data/merged/images/test
+nc: 1
+names: ["license_plate"]

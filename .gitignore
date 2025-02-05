@@ -1,0 +1,5 @@
+.venv
+data
+models
+src/yolo/yolo11n.pt
+runs/

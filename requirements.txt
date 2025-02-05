@@ -1,0 +1,6 @@
+opencv-contrib-python==4.11.0.86
+torch==2.6.0
+easyocr==1.7.2
+matplotlib==3.10.0 
+ultralytics==8.3.70 
+torchmetrics==1.6.1
