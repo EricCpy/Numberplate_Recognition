@@ -3,3 +3,4 @@ data
 models
 src/yolo/yolo11n.pt
 runs/
+__pycache__
