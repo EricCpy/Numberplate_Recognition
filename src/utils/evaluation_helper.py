@@ -1,6 +1,11 @@
+import random
+import cv2
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 from torch import tensor
 from torchmetrics.classification import AveragePrecision
+
 
 class ObjectDetectionEvaluator:
     def __init__(self, model, images, true_bboxes, predict_function, default_iou_threshold = 0.5):
@@ -128,21 +133,110 @@ class ObjectDetectionEvaluator:
     
     
     def visualize_confusion_matrix(self, conf_threshold=0.25, iou_threshold=0.5):
-        # TODO visualize the confusion matrix with matplotlib
-        # call calculate_confusion_matrix
-        
+        confusion = self.calculate_confusion_matrix(conf_threshold, iou_threshold)
+        tp, fp, fn = confusion["Confusion Matrix"]["TP"], confusion["Confusion Matrix"]["FP"], confusion["Confusion Matrix"]["FN"]
+        confusion_matrix = np.array([[tp, fp], [fn, 0]])
+
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.heatmap(confusion_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=["Predicted: Plate", "Predicted: Background"],
+                    yticklabels=["True: Plate", "True: Background"], cbar=False)
+
+        plt.xlabel('Predicted Labels')
+        plt.ylabel('True Labels')
+        plt.title(f'Confusion Matrix (Confidence Threshold: {conf_threshold} IoU Threshold: {iou_threshold})')
+        plt.show()
+    
+    
+    def __visualize_metric_confidence(self, iou_threshold=0.5, metric_type="precision", visualize=True):
+        metrics = []
+        step_size = 0.01
+        thresholds = np.arange(0.0, 1.01, step_size)
+
+        for threshold in thresholds:
+            confusion = self.calculate_confusion_matrix(threshold)
+            tp, fp = confusion["Confusion Matrix"]["TP"], confusion["Confusion Matrix"]["FP"]
+            metric = confusion["Box(Precision)"] if metric_type.lower() == "precision" else confusion["Box(Recall)"]
+            if metric_type.lower() == "precision" and tp == 0 and fp == 0:
+                print(f"Precision calculation not possible at confidence ge: {threshold}")
+                # add 0.01 for current
+                missing_thresholds = int((1.02 - threshold) / 0.01)
+                metrics.extend([1] * missing_thresholds)
+                break
+            
+            metrics.append(metric)
+            
+        if visualize == True:
+            plt.plot(thresholds, metrics, label=f'{metric_type.title()} at IoU {iou_threshold}')
+            plt.xlabel('Confidence Threshold')
+            plt.ylabel(f'{metric_type.title()}')
+            plt.title(f'{metric_type.title()} vs Confidence Threshold (IoU: {iou_threshold})')
+            plt.grid(True)
+            plt.show()
+            
+        return metrics
+
+    
     def visualize_precision_confidence_curve(self, iou_threshold=0.5):
-        # TODO
+        self.__visualize_metric_confidence(iou_threshold, "precision")
         
+    
     def visualize_recall_confidence_curve(self, iou_threshold=0.5):
-        # TODO
-        
+        self.__visualize_metric_confidence(iou_threshold, "recall")
+    
+    
     def visualize_precision_recall_curve(self, iou_threshold=0.5):
-        # TODO
-        
-    def visualize_precision_recall_curve(self, iou_threshold=0.5):
-        # TODO
-        
+        precisions = self.__visualize_metric_confidence(iou_threshold, "precision", False)
+        recalls = self.__visualize_metric_confidence(iou_threshold, "recall", False)
+
+        plt.plot(recalls, precisions, label=f'Precision-Recall Curve at IoU {iou_threshold}')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title(f'Precision vs Recall (IoU: {iou_threshold})')
+        plt.grid(True)
+        plt.show() 
+
+   
     def visualize_for_examples(self, conf_threshold=0.25, iou_threshold=0.6, seed=1234):
-        # TODO with cv2 or matplotlib take 4 images display them in a grid with in green ground truth boundingbox in blue predicted boundingbox
-        # display the confidence at the top of each boundingbox and
+        random.seed(seed)
+        sample_indices = random.sample(range(len(self.images)), 4)
+
+        fig, axs = plt.subplots(2, 2, figsize=(12, 12))
+        axs = axs.flatten()
+        for axs_idx, idx in enumerate(sample_indices):
+            img_path = self.images[idx]
+            ground_truths = self.true_bboxes[idx]
+            confidences, predicted_boxes = self.predict_function(self.model, img_path)
+            sorted_indices = np.argsort(confidences)[::-1]
+            confidences = np.array(confidences)[sorted_indices]
+            predicted_boxes = np.array(predicted_boxes)[sorted_indices]
+
+            # Draw BBs into img
+            img = cv2.imread(img_path)
+            for gt in ground_truths:
+                x1, y1, x2, y2 = gt
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2) # Green for ground truth
+
+            # This code is a straight copy from the function self.__calculate_model_predictions could be refactored
+            matched = set()
+            for conf, pred_box in zip(confidences, predicted_boxes):
+                iou_max, matched_gt = 0, None
+                for i, gt_box in enumerate(ground_truths):
+                    iou_score = self.iou(pred_box, gt_box)
+                    if iou_score > iou_max:
+                        iou_max, matched_gt = iou_score, i
+
+                is_match = iou_max >= iou_threshold and matched_gt not in matched
+                if conf >= conf_threshold and is_match:
+                    x1, y1, x2, y2 = map(int, pred_box)
+                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)  # Blue for predictions
+                    cv2.putText(img, f'{conf:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2, cv2.LINE_AA)
+
+                    if is_match:
+                        matched.add(matched_gt)
+
+            axs[axs_idx].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            axs[axs_idx].axis('off')
+            axs[axs_idx].set_title(f'Example {idx + 1}')
+
+        plt.tight_layout()
+        plt.show()        
