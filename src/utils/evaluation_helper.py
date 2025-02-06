@@ -2,6 +2,7 @@ import random
 import cv2
 import numpy as np
 import seaborn as sns
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch import tensor
 from torchmetrics.classification import AveragePrecision
@@ -34,7 +35,7 @@ class ObjectDetectionEvaluator:
         # but this takes a lot of time -> this trade-off is done to optimize the calculations here
         all_predicted_confidences, all_predicted_labels, all_iou_scores = [], [], []
         
-        for img, ground_truths in zip(self.images, self.true_bboxes):
+        for img, ground_truths in tqdm(zip(self.images, self.true_bboxes), total=len(self.images), desc="Processing images"):
             confidences, predicted_boxes = self.predict_function(self.model, img)
             sorted_indices = np.argsort(confidences)[::-1]
             confidences = np.array(confidences)[sorted_indices]
