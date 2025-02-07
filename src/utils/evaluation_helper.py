@@ -6,7 +6,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch import tensor
 from torchmetrics.classification import AveragePrecision
-
+import torch
 
 class ObjectDetectionEvaluator:
     def __init__(self, model, images, true_bboxes, predict_function, default_iou_threshold = 0.5):
@@ -33,6 +33,7 @@ class ObjectDetectionEvaluator:
         # bc I dont take into account that when the confidence for one box is too low
         # that another predicted box with lower confidence but with same or higher IoU could be true then, I could recalculate for every IoU
         # but this takes a lot of time -> this trade-off is done to optimize the calculations here
+        # (there is probably an algorithm to do this more efficient, but thats not the scope of the project and seems like the influence of this error is small)
         all_predicted_confidences, all_predicted_labels, all_iou_scores = [], [], []
         
         for img, ground_truths in tqdm(zip(self.images, self.true_bboxes), total=len(self.images), desc="Processing images"):
@@ -150,8 +151,7 @@ class ObjectDetectionEvaluator:
     
     def __visualize_metric_confidence(self, iou_threshold=0.5, metric_type="precision", visualize=True):
         metrics = []
-        step_size = 0.01
-        thresholds = np.arange(0.0, 1.01, step_size)
+        thresholds = np.linspace(0.0, 1.0, 101)
 
         for threshold in thresholds:
             confusion = self.calculate_confusion_matrix(threshold)
@@ -159,8 +159,7 @@ class ObjectDetectionEvaluator:
             metric = confusion["Box(Precision)"] if metric_type.lower() == "precision" else confusion["Box(Recall)"]
             if metric_type.lower() == "precision" and tp == 0 and fp == 0:
                 print(f"Precision calculation not possible at confidence ge: {threshold}")
-                # add 0.01 for current
-                missing_thresholds = int((1.02 - threshold) / 0.01)
+                missing_thresholds = int((101 - (threshold * 100)))
                 metrics.extend([1] * missing_thresholds)
                 break
             
@@ -204,17 +203,24 @@ class ObjectDetectionEvaluator:
         fig, axs = plt.subplots(2, 2, figsize=(12, 12))
         axs = axs.flatten()
         for axs_idx, idx in enumerate(sample_indices):
-            img_path = self.images[idx]
+            img = self.images[idx]
             ground_truths = self.true_bboxes[idx]
-            confidences, predicted_boxes = self.predict_function(self.model, img_path)
+            confidences, predicted_boxes = self.predict_function(self.model, img)
             sorted_indices = np.argsort(confidences)[::-1]
             confidences = np.array(confidences)[sorted_indices]
             predicted_boxes = np.array(predicted_boxes)[sorted_indices]
 
+            # Convert img
+            if isinstance(img, torch.Tensor):
+                img = img.permute(1, 2, 0).cpu().numpy()
+                img = (img * 255).astype(np.uint8) if img.dtype != np.uint8 else img
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if img.shape[-1] == 3 else img
+            else:
+                img = cv2.imread(img)
+                
             # Draw BBs into img
-            img = cv2.imread(img_path)
             for gt in ground_truths:
-                x1, y1, x2, y2 = gt
+                x1, y1, x2, y2 = map(int, gt)
                 cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2) # Green for ground truth
 
             # This code is a straight copy from the function self.__calculate_model_predictions could be refactored
