@@ -187,16 +187,19 @@ class ObjectDetectionEvaluator:
         self.__visualize_metric_confidence(iou_threshold, "recall")
     
     
-    def visualize_precision_recall_curve(self, iou_threshold=0.5):
+    def visualize_precision_recall_curve(self, iou_threshold=0.5, visualize=True):
         precisions = self.__visualize_metric_confidence(iou_threshold, "precision", False)
         recalls = self.__visualize_metric_confidence(iou_threshold, "recall", False)
 
-        plt.plot(recalls, precisions, label=f'Precision-Recall Curve at IoU {iou_threshold}')
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.title(f'Precision vs Recall (IoU: {iou_threshold})')
-        plt.grid(True)
-        plt.show() 
+        if visualize == True:
+            plt.plot(recalls, precisions, label=f'Precision-Recall Curve at IoU {iou_threshold}')
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.title(f'Precision vs Recall (IoU: {iou_threshold})')
+            plt.grid(True)
+            plt.show() 
+        
+        return precisions, recalls
 
    
     def visualize_for_examples(self, conf_threshold=0.25, iou_threshold=0.6, seed=1234):
