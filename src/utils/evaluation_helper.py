@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from torch import tensor
 from torchmetrics.classification import AveragePrecision
 import torch
+import easyocr
+import time
 
 class ObjectDetectionEvaluator:
     def __init__(self, model, images, true_bboxes, predict_function, default_iou_threshold = 0.5, processor=None):
@@ -248,3 +250,78 @@ class ObjectDetectionEvaluator:
 
         plt.tight_layout()
         plt.show()        
+
+    
+    def generate_evaluation_video(self, deepsort, video_path, output_path, conf_threshold=0.25):
+        def get_color(track_id):
+            if track_id not in track_colors:
+                track_colors[track_id] = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            return track_colors[track_id]
+        
+        track_colors = {}
+        ocr_change = {}
+        cap = cv2.VideoCapture(video_path)
+
+        frame_width = int(cap.get(3))
+        frame_height = int(cap.get(4))
+        frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, frame_rate, (frame_width, frame_height))
+
+        processing_time_frames = []
+        reader = easyocr.Reader(['en'])
+
+        while cap.isOpened():
+            start_time = time.time()
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            confidences, boxes = self.predict_function(self.model, frame, confidence=conf_threshold)
+            track_detections = []
+            for confidence, bbox in zip(confidences, boxes):
+                bbox = list(map(int, bbox))
+                # left top width height format for deepsort
+                bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                track_detections.append((bbox, confidence, None))
+
+            # Tracking
+            tracks = deepsort.update_tracks(track_detections, frame=frame)    
+            for track in tracks:
+                if not track.is_confirmed():
+                    continue
+                
+                track_id = track.track_id
+                x1, y1, x2, y2 = map(int, track.to_ltrb())
+                color = get_color(track_id)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+                cropped_plate = frame[y1:y2, x1:x2]
+                plate_text = "unknown"
+                if cropped_plate.shape[0] > 0 and cropped_plate.shape[1] > 0:
+                    cropped_plate_gray = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2GRAY)
+                    result = reader.readtext(cropped_plate_gray)
+                    plate_text = (result[0][-2] if result else "unknown").lower()  
+                    if plate_text != "unknown" and (track_id not in ocr_change or (track_id in ocr_change and plate_text not in ocr_change[track_id])):
+                        different_numbers_detected = ocr_change.get(track_id, [])
+                        different_numbers_detected.append(plate_text)
+                        ocr_change[track_id] = different_numbers_detected
+
+                cv2.putText(frame, f'ID {track_id}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(frame, f'Plate: {plate_text}', (x1, y1 - 25),  cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(frame, f'Conf {confidence:.2f}', (x1, y1 - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+
+            processing_time_frames.append(time.time() - start_time)
+            out.write(frame)
+            cv2.imshow('Tracking', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            
+        cap.release()
+        out.release()
+        cv2.destroyAllWindows()
+
+        print(f"Average Processing Time per Frame: {np.mean(processing_time_frames)}")
+        print(f"Average Number of Different Plate Prediction per Tracking Target: {sum(len(x) for x in ocr_change.values()) / len(ocr_change)}")

@@ -176,8 +176,13 @@ def detr_predict(model, img, conf_threshold=0.001, **kwargs):
 
 
 @torch.inference_mode()
-def fasterrcnn_predict(model, img, conf_threshold = 0.001, **kwargs):
+def fasterrcnn_predict(model, img, confidence = 0.001, **kwargs):
     model.eval()
+    if not isinstance(img, torch.Tensor):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = transforms.ToTensor()(img).to(device)
+    
     if not isinstance(img, list):
         img = [img]
 
@@ -192,7 +197,7 @@ def fasterrcnn_predict(model, img, conf_threshold = 0.001, **kwargs):
             scores = output["scores"].cpu().numpy()
             bboxes = output["boxes"].cpu().numpy()
             
-            valid_indices = scores > conf_threshold
+            valid_indices = scores > confidence
             scores = scores[valid_indices]
             bboxes = bboxes[valid_indices]
     

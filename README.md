@@ -28,3 +28,40 @@ The implementation of this project will contain several key components:
 
 YOLO Training ~2h over all data, optimized perfectly everything intern
 FasterRCNN (mobilenet ~2h, resnet ~4h) over all data, you need to optimize everything yourself with pytorch
+
+
+# Inhalt der ReadMe
+
+# Problem
+Problem beschreiben, beschreiben, was ich genau machen will und warum ich was teste. Eigentlich schon fertig.
+
+# Related Work / Motivation
+Noch auf die beiden Paper eingehen, die ich gefunden habe, wo verschiedene Modelle miteinander verglichen werden.
+Noch auf die Benchmark zu Coco eingehen, die ich gefunden habe.
+
+# Implementation
+## Data
+## Object Detection
+### Edge Detection
+### Fasterrcnn
+### YOLO
+### DETR
+
+## Object Tracking
+Deepsort
+
+# Evaluation
+
+## Metrics
+- beschreibe die verschiedenen metriken, die ich zu evaluation verwendet habe
+
+## Object Detection Results
+
+Show evaluation of different models.
+
+## Performance 
+
+
+# Conclusion
+show model applied on final video
+
