@@ -42,7 +42,6 @@ class LicensePlateDataset(Dataset):
         if self.processor is not None:
             target = self.__parse_to_processor_targets(idx, image, boxes)
             target["processor"] = self.processor
-            target["boxes_xyxy"] = self.processor
             return image, target
          
         # Handle empty bounding boxes
