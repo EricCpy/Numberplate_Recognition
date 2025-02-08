@@ -32,7 +32,6 @@ class LicensePlateDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         H, W, _ = image.shape
         boxes = yolo_to_bbox(annotation_path, W, H)
-        
         # -> gave me worse results than internal scaling
         if self.resize:
             image, boxes = self.resize_and_pad(image, boxes, self.resize_shape) 
@@ -40,7 +39,7 @@ class LicensePlateDataset(Dataset):
             image = transforms.ToTensor()(image)
         
         if self.processor is not None:
-            target = self.__parse_to_processor_targets(idx, image, boxes)
+            target = self.__parse_to_processor_targets(idx, image, annotation_path)
             target["processor"] = self.processor
             return image, target
          
@@ -58,23 +57,26 @@ class LicensePlateDataset(Dataset):
         
         return image, target
     
-    def __parse_to_processor_targets(self, idx, image, boxes):
-        if len(boxes) == 0:
-            target = {"image_id": idx, "annotations": []}
-        else:
-            # Detr uses xywh format
-            boxes = np.array(boxes, dtype=np.float32)
-            annotations = [
-                {"bbox": [x_min, y_min, x_max - x_min, y_max - y_min], 
-                 "category_id": 1,
-                 "area": (x_max - x_min) * (y_max - y_min),
-                 "iscrowd": 0}
-                for x_min, y_min, x_max, y_max in boxes
-            ]
-            target = {
-                "image_id": idx,
-                "annotations": annotations
-            }
+    def __parse_to_processor_targets(self, idx, image, annotation_path):
+        annotations = []
+        _, H, W = image.shape
+        with open(annotation_path, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                
+                _, x_center, y_center, width, height = map(float, parts)
+                width_pixel = width * W
+                height_pixel = height * H
+                area = width_pixel * height_pixel
+                annotations.append({"bbox": [x_center, y_center, width, height], 
+                                    "category_id": 1,
+                                    "area": area,
+                                    "iscrowd": 0})
+        
+        target = {
+            "image_id": idx,
+            "annotations": annotations
+        }
 
         encoding = self.processor(images=image, annotations=target, return_tensors="pt")
         return encoding
