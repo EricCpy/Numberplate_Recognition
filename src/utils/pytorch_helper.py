@@ -12,9 +12,10 @@ import random
 from tqdm import tqdm
 
 class LicensePlateDataset(Dataset):
-    def __init__(self, images_dir, annotations_dir, resize = False, resize_shape = (640, 640)):
+    def __init__(self, images_dir, annotations_dir, processor = None, resize = False, resize_shape = (640, 640)):
         self.images_dir = images_dir
         self.annotations_dir = annotations_dir
+        self.processor = processor
         self.resize = resize
         self.resize_shape = resize_shape
         self.image_files = sorted([f for f in os.listdir(images_dir) if f.endswith('.jpg')])
@@ -37,7 +38,13 @@ class LicensePlateDataset(Dataset):
             image, boxes = self.resize_and_pad(image, boxes, self.resize_shape) 
         else:
             image = transforms.ToTensor()(image)
-            
+        
+        if self.processor is not None:
+            target = self.__parse_to_processor_targets(idx, image, boxes)
+            target["processor"] = self.processor
+            target["boxes_xyxy"] = self.processor
+            return image, target
+         
         # Handle empty bounding boxes
         if len(boxes) == 0:
             boxes = torch.zeros((0, 4), dtype=torch.float32)  # No bounding boxes
@@ -52,6 +59,27 @@ class LicensePlateDataset(Dataset):
         
         return image, target
     
+    def __parse_to_processor_targets(self, idx, image, boxes):
+        if len(boxes) == 0:
+            target = {"image_id": idx, "annotations": []}
+        else:
+            # Detr uses xywh format
+            boxes = np.array(boxes, dtype=np.float32)
+            annotations = [
+                {"bbox": [x_min, y_min, x_max - x_min, y_max - y_min], 
+                 "category_id": 1,
+                 "area": (x_max - x_min) * (y_max - y_min),
+                 "iscrowd": 0}
+                for x_min, y_min, x_max, y_max in boxes
+            ]
+            target = {
+                "image_id": idx,
+                "annotations": annotations
+            }
+
+        encoding = self.processor(images=image, annotations=target, return_tensors="pt")
+        return encoding
+        
     def resize_and_pad(self, image, boxes, target_size):
         # gave me worse results than internal scaling
         h, w, _ = image.shape
@@ -82,7 +110,7 @@ class LicensePlateDataset(Dataset):
     
     
 # Training function
-def train_one_epoch(model, optimizer, data_loader, device, epoch, scaler=None):
+def train_one_epoch(model, optimizer, data_loader, device, epoch, scaler=None, processor=None):
     model.train()
     
     lr_scheduler = None
@@ -95,12 +123,20 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, scaler=None):
     
     total_loss = 0
     for images, targets in tqdm(data_loader, total=len(data_loader), desc="Processing batches"):
-        images = [image.to(device) for image in images]
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        # Enable mixed precision -> helps with GPU Memory
-        with autocast("cuda", enabled=scaler is not None):
-            loss_dict = model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
+        if processor is not None:
+            pixel_values = targets["pixel_values"].to(device)
+            pixel_mask = targets["pixel_mask"].to(device)
+            labels = [{k: v.to(device) for k, v in t.items()} for t in targets["labels"]]
+            with autocast("cuda", enabled=scaler is not None):
+                outputs = model(pixel_values = pixel_values, pixel_mask = pixel_mask, labels = labels)
+                losses = outputs.loss
+        else:
+            images = [image.to(device) for image in images]
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            # Enable mixed precision -> helps with GPU Memory
+            with autocast("cuda", enabled=scaler is not None):
+                loss_dict = model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
         
         optimizer.zero_grad()
         if scaler is not None:
@@ -120,7 +156,26 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, scaler=None):
 
 
 @torch.inference_mode()
-def fasterrcnn_predict(model, img, conf_threshold = 0.001):
+def detr_predict(model, img, conf_threshold=0.001, **kwargs):
+    model.eval()
+    processor = kwargs["processor"]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    encoding = processor(img, return_tensors="pt").to(device)
+    outputs = model(**encoding)
+    
+    confidences = outputs.logits.softmax(-1)[..., :-1].max(-1)[0].cpu().numpy()
+    boxes = outputs.pred_boxes.cpu().numpy()
+    
+    valid_indices = confidences > conf_threshold
+    confidences = confidences[valid_indices]
+    boxes = boxes[valid_indices]
+    
+    return confidences.tolist(), boxes.tolist()
+
+
+@torch.inference_mode()
+def fasterrcnn_predict(model, img, conf_threshold = 0.001, **kwargs):
     model.eval()
     if not isinstance(img, list):
         img = [img]
@@ -147,7 +202,7 @@ def fasterrcnn_predict(model, img, conf_threshold = 0.001):
 
 
 @torch.inference_mode()
-def evaluate(model, data_loader, device):
+def evaluate(model, data_loader, device, processor=None):
     model.eval()
     
     all_imges = []
@@ -156,13 +211,28 @@ def evaluate(model, data_loader, device):
         all_imges.extend([img.to(device) for img in images])
         all_bboxes.extend([target["boxes"].cpu().numpy().tolist() for target in targets])
        
-    evaluator = ObjectDetectionEvaluator(model, all_imges, all_bboxes, fasterrcnn_predict)
+    evaluator = ObjectDetectionEvaluator(model, all_imges, all_bboxes, fasterrcnn_predict, processor=processor)
     metric_summary = evaluator.get_metric_summary(verbose=False)
     
     return metric_summary
 
+
+def collate_fn_detr(batch):
+    processor = batch[0][1]["processor"]
+    pixel_values = [target["pixel_values"].squeeze() for _, target in batch]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    encoding = processor.pad(pixel_values, return_tensors="pt")
+    labels = [{k: v.to(device) for k, v in target["labels"][0].items()} for _, target in batch]
+    new_targets = {}
+    new_targets['pixel_values'] = encoding['pixel_values'].to(device)
+    new_targets['pixel_mask'] = encoding['pixel_mask'].to(device)
+    new_targets['labels'] = labels
+    return "dummy", new_targets
+
+
 def collate_fn(batch):
     return tuple(zip(*batch))
+
 
 def get_subset(dataset, fraction=0.2, seed=1234):
     subset_size = int(len(dataset) * fraction)

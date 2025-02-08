@@ -9,12 +9,13 @@ from torchmetrics.classification import AveragePrecision
 import torch
 
 class ObjectDetectionEvaluator:
-    def __init__(self, model, images, true_bboxes, predict_function, default_iou_threshold = 0.5):
+    def __init__(self, model, images, true_bboxes, predict_function, default_iou_threshold = 0.5, processor=None):
         self.model = model
         self.images = images
         self.true_bboxes = true_bboxes
         self.predict_function = predict_function
         self.default_iou_threshold = default_iou_threshold
+        self.processor = processor
         self.predicted_confidences, self.predicted_labels, self.iou_scores = self.__calculate_model_predictions(default_iou_threshold)
     
     
@@ -37,7 +38,7 @@ class ObjectDetectionEvaluator:
         all_predicted_confidences, all_predicted_labels, all_iou_scores = [], [], []
         
         for img, ground_truths in tqdm(zip(self.images, self.true_bboxes), total=len(self.images), desc="Processing images"):
-            confidences, predicted_boxes = self.predict_function(self.model, img)
+            confidences, predicted_boxes = self.predict_function(self.model, img, processor=self.processor)
             sorted_indices = np.argsort(confidences)[::-1]
             confidences = np.array(confidences)[sorted_indices]
             predicted_boxes = np.array(predicted_boxes)[sorted_indices]
