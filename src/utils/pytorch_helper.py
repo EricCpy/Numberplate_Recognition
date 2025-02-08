@@ -202,7 +202,7 @@ def fasterrcnn_predict(model, img, conf_threshold = 0.001, **kwargs):
 
 
 @torch.inference_mode()
-def evaluate(model, data_loader, device, processor=None):
+def evaluate(model, data_loader, device, prediction_function, processor=None):
     model.eval()
     
     all_imges = []
@@ -211,7 +211,7 @@ def evaluate(model, data_loader, device, processor=None):
         all_imges.extend([img.to(device) for img in images])
         all_bboxes.extend([target["boxes"].cpu().numpy().tolist() for target in targets])
        
-    evaluator = ObjectDetectionEvaluator(model, all_imges, all_bboxes, fasterrcnn_predict, processor=processor)
+    evaluator = ObjectDetectionEvaluator(model, all_imges, all_bboxes, prediction_function, processor=processor)
     metric_summary = evaluator.get_metric_summary(verbose=False)
     
     return metric_summary
