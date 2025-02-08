@@ -24,26 +24,7 @@ The implementation of this project will contain several key components:
 4. **Android Application Development**: Build a mobile application to deploy the final product for end-users.
 5. **Evaluation**: Assess the systems performance using a test dataset and our own video footage, comparing the effectiveness of various implementations, including MobileNet, YOLO and simple edge detection techniques.
 
+# Performance
 
-# TODO
-- [ ] Object detection
-  - [x] build license plate detection and car with edge detection as base line
-  - [ ] build license plate and car detection with models
-    - [x] ultralytics yolo
-    - [x] pytorch object detection api mobilenet
-    - [ ] optional: mmdetect?
-
-- [x] OCR
-  - [x] OCR selected based on the following video https://www.youtube.com/watch?v=00zR9rJnecA
-  - [x] if I would like to improve ocr maybe fine tune ocr or retrain ocr model on my license plate data, but didnt find a license plate dataset which contains plate names
-
-- [ ] Object Tracking
-  - [ ] use deep sort and at least one other algorithm to keep track of objects
-  - [ ] use simple own algorithm where I match and keep track on objects based on OCR and compare to Sota Methods
-  - [ ] evaluate and continue with best
-
-- [ ] use IoU for object detection as metric and use track over bounding box as metric
-- [ ] apply on own video and evaluate for errors and different approaches
-- [ ] write report
-- [ ] create poster presentation
-- [ ] optional: try to implement SOTA Method from Paper, compare my results to paper results
+YOLO Training ~2h over all data, optimized perfectly everything intern
+FasterRCNN ~10h over all data, you need to optimize everything yourself with pytorch
