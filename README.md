@@ -5,7 +5,7 @@
 The ability to recognize vehicle license plates offers significant advantages across various domains, such as traffic management, parking automation and law enforcement. This project aims to develop a system capable of detecting and recognizing license plates in images and videos. The system will create bounding boxes around the plates and either crop them into separate images or directly extract the license plate numbers from designated areas of interest.
 
 Our solution will be optimized for real-time operation, processing both static images and dynamic video feeds. It will detect all vehicles within each frame and track their movements across subsequent frames, ensuring consistent identification of vehicles and their corresponding license plates.
-Ultimately, our aim is to create a mobile application that allows us to utilize this technology on our smartphone.
+Ultimately, the goal is to apply the system to personal videos, which present special challenges such as instability.
 
 ## Related Work
 Automatic license plate recognition (ALPR) has been explored in several existing systems, such as OpenALPR. These systems have successfully been deployed in various settings, including parking facilities and highways, showcasing their potential for enhancing vehicle monitoring and control. 
@@ -21,10 +21,10 @@ The implementation of this project will contain several key components:
 
 1. **Object Detection**: Develop a module to accurately detect license plates within images and videos.
 2. **Optical Character Recognition (OCR)**: Integrate an OCR system to read and extract license plate numbers from detected regions.
-4. **Android Application Development**: Build a mobile application to deploy the final product for end-users.
-5. **Evaluation**: Assess the systems performance using a test dataset and our own video footage, comparing the effectiveness of various implementations, including MobileNet, YOLO and simple edge detection techniques.
+3. **Evaluation**: Assess the systems performance using a test dataset and our own video footage, comparing the effectiveness of various implementations, including MobileNet, YOLO and simple edge detection techniques.
 
-# Performance
+
+# Training
 
 YOLO Training ~2h over all data, optimized perfectly everything intern
-FasterRCNN ~10h over all data, you need to optimize everything yourself with pytorch
+FasterRCNN (mobilenet ~2h, resnet ~4h) over all data, you need to optimize everything yourself with pytorch
