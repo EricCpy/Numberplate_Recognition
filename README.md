@@ -16,7 +16,7 @@ There are numerous videos on YouTube and various websites showcasing how to buil
 
 However, many of these videos do not discuss the differences between algorithms or compare them. To choose the optimal algorithm, one must first define requirements, for example, whether the system needs to operate in real-time or not. A good starting point for finding suitable object detection models was the [Papers with Code](https://paperswithcode.com/sota/object-detection-on-coco) Benchmark, which provides an overview of the top-performing models over the years. Additionally, [this paper](https://www.sciencedirect.com/science/article/pii/S095219762400616X) was particularly helpful in understanding and evaluating different object detection methods, guiding my decision on which approaches to experiment with.  
 
-This led to the goal of testing license plate object detection using multiple models, starting with Faster R-CNNs, comparing them with the latest YOLO model (YOLO v11) and also implementing an detection transformer (DETR).  
+This led to the goal of testing license plate object detection using multiple models, starting with Faster R-CNNs, comparing them with the latest YOLO model (YOLOv11) and also implementing an detection transformer (DETR).  
 
 Beyond object detection, the project also involves an OCR and an object tracking task. Various research papers explore image preprocessing techniques for achieving optimal OCR results, such as this one specifically for license plates [Comparison of Image Preprocessing Techniques for Vehicle License Plate Recognition Using OCR: Performance and Accuracy Evaluation](https://arxiv.org/abs/2410.13622). However, we chose to stick with EasyOCR and grayscale images, despite this paper indicating a slight decline in performance when using EasyOCR with grayscale images.
 
@@ -37,7 +37,7 @@ The models were trained using data from the following sources:
 
 
 ### Large Dataset
-The **large dataset** was created by merging images from various sources, including websites and other datasets, into a single expansive collection. To increase the diversity of the training data, we applied image augmentations, such as snowflakes and random rotations. The images were then organized into three directories: training, validation, and test sets. This dataset follows the YOLO format for bounding box annotations. YOLO annotations store each object's data using the following five parameters:
+The **large dataset** was created by merging images from various sources, including websites and other datasets, into a single expansive collection. To increase the diversity of the training data, we applied image augmentations, such as snowflakes and random rotations. The images were then organized into three directories: training, validation and test sets. This dataset follows the YOLO format for bounding box annotations. YOLO annotations store each object's data using the following five parameters:
 ```
 class_id boundingbox_center_x boundingbox_center_y boundingbox_width boundingbox_height
 ```
@@ -51,7 +51,7 @@ The **small dataset** consists of 433 high-quality images, with annotations in V
 
 
 ### Merged Dataset
-Both datasets were combined into a unified dataset for training, validation, and testing. To ensure consistency in annotation formats, we converted the VOC annotations from the smaller dataset into YOLO format using the **[YOLO Format Converter](src/data_processing/yolo_format_converter.ipynb)**.
+Both datasets were combined into a unified dataset for training, validation and testing. To ensure consistency in annotation formats, we converted the VOC annotations from the smaller dataset into YOLO format using the **[YOLO Format Converter](src/data_processing/yolo_format_converter.ipynb)**.
 
 The YOLO format was chosen because it is natively supported by the Ultralytics YOLO library. Additionally, it was easier to use this format to convert to different bounding box formats, which were necessary for some of our PyTorch models. To manage these formats effectively, we developed a **[custom PyTorch DataClass](src/utils/pytorch_helper.py)**.
 
@@ -217,14 +217,131 @@ In our implementation, we used EasyOCR directly without any fine-tuning or custo
 
 
 ## Evaluation
+This chapter evaluates various object detection methods and general license plate recognition. Additionally, potential improvements are discussed.
 
-### Object Detection
+Here’s an improved and translated version of your chapter:  
 
-#### Metrics
-- beschreibe die verschiedenen metriken, die ich zu evaluation verwendet habe
+### Object Detection  
 
+This chapter evaluates the object detection methods Faster R-CNN with ResNet50, Faster R-CNN with MobileNetv3 and YOLOv11. The evaluation focuses on the metrics Precision, Recall, mAP50 and mAP50-95. To facilitate the analysis and visualization of these metrics, an [evaluation helper class](src/utils/evaluation_helper.py) was implemented. The evaluation notebooks can be found at:   
+- [Faster RCNN ResNet50 Evaluation](src/fasterrcnn/fasterrcnn_resnet50_evaluation.ipynb)  
+- [Faster RCNN MobileNetV3 Evaluation](src/fasterrcnn/fasterrcnn_mobilenet3_evaluation.ipynb)  
+- [YOLO Evaluation Evaluation](src/yolo/yolo_evaluation.ipynb) 
 
-Show evaluation of different models.
+#### Metrics  
+*[Resource](https://docs.ultralytics.com/guides/yolo-performance-metrics/#results-storage)*
+
+When evaluating object detection models, we can use many of the same metrics as in traditional classification tasks. However, metrics that rely on True Negatives (TN), such as accuracy, are not applicable. Instead, we assess model performance using precision, recall and mean Average Precision (mAP), all of which are based on Intersection over Union (IOU) scores.  
+
+Object detection predictions can be categorized using a confusion matrix approach or a metric like average IOU:  
+- **True Positives (TP):** A predicted bounding box that correctly overlaps with a ground truth bounding box based on a predefined IOU threshold.  
+- **False Positives (FP):** A predicted bounding box that does not sufficiently overlap with any ground truth bounding box, indicating an incorrect detection.  
+- **False Negatives (FN):** A ground truth bounding box that has no corresponding prediction with a sufficient IOU, indicating a missed detection.  
+- **True Negatives (TN):** A correctly predicted background region that overlaps with the actual background. However, since the number of background bounding boxes is undefined and we do not explicitly predict background regions, True Negatives are typically left undefined in object detection tasks.  
+
+The following pseudo-code illustrates how to compute the confusion matrix based on predicted bounding boxes and their IOU scores with ground truth boxes (a python implmenetation can be found in the [evaluation helper class](src/utils/evaluation_helper.py)):  
+```plaintext
+dataset = list of our images
+image_predictions = list of our predictions for each image containing (confidence, label, iou)
+function calculate_confusion_matrix(conf_threshold=0.25, iou_threshold=0.5) -> dict:
+    tp, fp, fn = 0, 0, 0
+    for each image in dataset:
+        tp_img = 0
+        for each (confidence, label, iou) in image_predictions:
+            if confidence >= conf_threshold:  # Ignore low-confidence predictions (background)
+                if iou >= iou_threshold AND label == 1:  # Correct detection
+                    tp_img += 1
+                else:
+                    fp += 1  # Incorrect detection
+
+        tp += tp_img
+        fn += (number_of_ground_truths_in_image - tp_img)  # Missed detections
+    return tp, fp, fn
+```
+
+Using these confusion matrix properties, we calculate the following key metrics:  
+
+- **Precision:** The proportion of correctly predicted objects among all detected objects:  
+  $$
+  Precision = \frac{TP}{TP + FP}
+  $$  
+  A high precision score indicates that the model produces few false positives, meaning it primarily detects relevant objects while minimizing incorrect predictions.  
+
+- **Recall:** The proportion of correctly predicted objects among all actual objects:  
+  $$
+  Recall = \frac{TP}{TP + FN}
+  $$  
+  A high recall score signifies that the model successfully detects most of the actual objects, with minimal missed detections.  
+
+- **mAP50:** The Mean Average Precision at an IOU threshold of 50%. A prediction is considered correct if its IOU with the ground truth is at least 0.5. The mAP50 score is calculated by averaging the Average Precision (AP) across all object classes at this threshold. This involves iterating over all classes and computing precision at various confidence levels, taking the mean precision for each class and then averaging across all classes.  
+
+- **mAP50-95:** This metric extends mAP50 by computing AP over multiple IOU thresholds, ranging from 0.5 to 0.95 in 0.05 increments. It provides a more comprehensive evaluation of model performance across different levels of overlaps. A higher mAP50-95 score indicates that the model consistently delivers accurate predictions across varying IOU thresholds.  
+
+#### Model Comparison
+
+The following table summarizes the performance of three object detection models evaluated with a **minimum confidence threshold of 0.25** and a **minimum IoU of 0.5**. Note that the total number of detections (TP + FP + FN) differs among models because low-confidence predictions are discarded. For example, YOLO tends to generate more low-confidence predictions than the other models.
+
+| **Model**                    | **Precision** | **Recall** | **TP** | **FP** | **FN** | **mAP50** | **mAP50-95** |
+|------------------------------|---------------|------------|--------|--------|--------|-----------|--------------|
+| **Faster R-CNN ResNet50**    | 0.7655        | 0.9200     | 483    | 148    | 42     | 0.9706    | 0.7792       |
+| **Faster R-CNN MobileNetv3** | 0.7404        | 0.8419     | 442    | 155    | 83     | 0.9549    | 0.7749       |
+| **YOLO**                     | 0.8810        | 0.8324     | 437    | 59     | 88     | 0.9354    | 0.8001       |
+
+The following plots illustrate how precision and recall vary with different confidence thresholds:
+<div style="display: flex; justify-content: space-around; align-items: center;">
+    <div style="text-align: center;">
+        <p><strong>Recall vs. Confidence</strong></p>
+        <img src="documentation/recall_confidence.png" width="300">
+    </div>
+    <div style="text-align: center;">
+        <p><strong>Precision vs. Confidence</strong></p>
+        <img src="documentation/precision_confidence.png" width="300">
+    </div>
+    <div style="text-align: center;">
+        <p><strong>Recall vs. Precision</strong></p>
+        <img src="documentation/recall_precision.png" width="300">
+    </div>
+</div>
+
+**Faster R-CNN with ResNet50:**
+  - **Strengths:**
+    - **High Recall (0.92):** Detects a larger number of objects correctly.
+    - **High True Positives (483):** Indicates more accurate detections.
+    - **High mAP50 (0.9706):** Excellent performance at a 50% IoU threshold.
+  - **Weakness:** Slightly lower precision and IOUs (see mAP50-95) compared to YOLO, meaning it has more false positives.
+  - **Ideal Use Case:** When missing an object is critical and where overall good detections are needed.
+
+**Faster R-CNN with MobileNetv3:**
+- **Strengths:**
+  - Good balance between precision and recall.
+  - Decent mAP50 performance.
+- **Weakness:** Highest number of false positives (155), indicating a tendency to misclassify objects.
+- **Ideal Use Cases:** Scenarios requiring computational efficiency, such as applications on mobile devices.
+
+**YOLO:**
+- **Strengths:**
+  - **High Precision (0.88):** Produces fewer false positives.
+  - **Strong mAP50-95 (0.8001):** Consistent performance across various IoU thresholds.
+- **Weakness:** Lowest recall, which suggests that some objects may be missed.
+- **Ideal Use Cases:**  Real-time detection scenarios where speed and precision are more critical than detecting every possible object.
+
+Overall, **YOLO** tends to predict many bounding boxes, which are filtered out due to low confidence, leaving a high proportion of accurate predictions. In contrast, the **Faster R-CNN** models generates less bounding boxes but with higher confidence and a greater likelihood of being correct.
+The following example also visualizes this: 
+<div style="display: flex; justify-content: space-around; align-items: center;">
+    <div style="text-align: center;">
+        <p><strong>ResNet50 Example</strong></p>
+        <img src="documentation/resnet_example.png" width="300">
+    </div>
+    <div style="text-align: center;">
+        <p><strong>MobileNetv3 Example</strong></p>
+        <img src="documentation/mobilenet_example.png" width="300">
+    </div>
+    <div style="text-align: center;">
+        <p><strong>YOLO Example</strong></p>
+        <img src="documentation/yolo_example.png" width="300">
+    </div>
+</div>
+
 
 ### License Plate Recognition Pipeline
 show model applied on final video
@@ -233,6 +350,7 @@ show model applied on final video
 #### Performance 
 - show video
 
+### Improvements
 
 
 ## Conclusion

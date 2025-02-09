@@ -99,7 +99,7 @@ class ObjectDetectionEvaluator:
 
         precision = tp / (tp + fp + 1e-7)
         recall = tp / (tp + fn + 1e-7)
-        # I think accuracy doesnt make sense here bc we are not sure about the TNs
+        # Accuracy doesnt make sense here bc we are not sure about the TNs
         #accuracy = tp / (tp + fp + fn + 1e-7)
 
         return {
@@ -140,7 +140,7 @@ class ObjectDetectionEvaluator:
     def visualize_confusion_matrix(self, conf_threshold=0.25, iou_threshold=0.5):
         confusion = self.calculate_confusion_matrix(conf_threshold, iou_threshold)
         tp, fp, fn = confusion["Confusion Matrix"]["TP"], confusion["Confusion Matrix"]["FP"], confusion["Confusion Matrix"]["FN"]
-        confusion_matrix = np.array([[tp, fp], [fn, 0]])
+        confusion_matrix = np.array([[tp, fn], [fp, 0]])
 
         fig, ax = plt.subplots(figsize=(6, 6))
         sns.heatmap(confusion_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=["Predicted: Plate", "Predicted: Background"],
