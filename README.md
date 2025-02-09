@@ -65,38 +65,174 @@ We decided to keep the dataset split from the large dataset:
 While cross-validation could have been an option, we opted not to implement it due to the extensive training times required, which would have made it impractical us.
 
 
+## Implementation
+In this chapter, we will provide an overview of the algorithms used, explaining how they function and how we implemented them. We will first describe various object detection strategies before discussing object tracking techniques. All models discussed in this chapter were trained using an NVIDIA GTX 1080 Ti.
+
 
 ## Implementation
-
-
+In this chapter, I will provide an overview of the algorithms I used, explaining how they function and how I implemented them. I will first describe various object detection strategies and machine learning methods before discussing object tracking techniques.
 
 ### Object Detection
+Object detection is a computer vision task that involves identifying and locating objects within an image or video. Unlike simple classification, which determines what objects are present in an image, object detection provides additional information by drawing bounding boxes around detected objects. For example, in our applications, object detection can identify license plates and locate where they are in the image by providing us with a bounding box. 
+
 #### Edge Detection
-#### Fasterrcnn
+Edge detection is a fundamental image processing technique used to highlight structural boundaries within an image. It is often utilized as a preprocessing step in various tasks, but can also help us to extract relevant features without using complex machine learning methods.
+
+As a baseline we build a [pipeline](src/simple_edge_detection.ipynb), which detects license plates by just using image processing and edge/contour detection. In the following we will describe the edge detection task by using the following example image.  
+![Car](documentation/car.jpg)
+
+The pipeline works as following:
+
+1. **Convert Image to Grayscale:** Since color information is not essential for edge detection, we convert the image to grayscale, simplifying further processing steps.  
+![Car Gray](documentation/car_gray.png)
+
+2. **Apply Bilateral Filter:** A bilateral filter is used to reduce noise while preserving edges. Unlike a Gaussian filter, which smooths out edges, the bilateral filter ensures that important structural information remains intact.
+
+3. **Use Canny Edge Detection:** The Canny edge detector identifies edges by detecting areas of rapid intensity change. Notably, Canny edge detection includes an internal Gaussian smoothing step, but we found that applying a bilateral filter beforehand yielded better results and was easier to fine-tune. This step helps in detecting key contours that may correspond to license plates.  
+![Car Canny](documentation/car_canny.png)
+
+4. **Identify Contours and Sort by Size:** Contours are detected using the `cv2.findContours` function. These contours are then sorted by size to focus on the most relevant ones.
+
+5. **Approximate Contour Shapes:** Contours are approximated into polygonal shapes and filtering is applied based on the number of edges and aspect ratio to locate rectangular regions which look like license plates. 
+
+The image below highlights the most suitable license plate region while masking the rest in black.  
+![License Plate](documentation/license_plate.png)
+
+While edge detection provides a simple approach to detecting license plates, it does not work consistently across all images. It may detect irrelevant regions instead of the license plate, leading to unreliable results. This limitation brings us to the use of machine learning based object detection techniques for improved accuracy.
+
+
+#### Faster R-CNN
+*[Resource](https://www.lablab.top/post/how-does-faster-r-cnn-work-part-i/)*
+
+Faster R-CNN (Region-based Convolutional Neural Network) is an advanced object detection framework that enhances traditional R-CNN models by introducing the Region Proposal Network (RPN). This network efficiently proposes object regions, reducing computational overhead while maintaining high accuracy.
+
+![FasterRCNN Architecture](documentation/frcnn_architecture.jpg.png)
+
+**Working Principle:**
+1. **Feature Extraction:** A convolutional neural network (CNN) extracts features from the input image.
+2. **Region Proposal Network (RPN):** The RPN generates region proposals using anchor boxes and predicts objectness scores.
+3. **ROI Pooling:** Proposed regions are resized and pooled into a fixed size before classification.
+4. **Classification and Bounding Box Regression:** The final step classifies objects and refines bounding boxes.
+
+Faster R-CNN is known for it's high accuracy but requires substantial computational resources, making it slower than single-stage detectors like YOLO.
+
+Faster R-CNNs can be implemented with different backbone networks for feature extraction. The choice of backbone significantly impacts the models speed and accuracy. In our implementation, we experimented with two different backbones: **ResNet50** and **MobileNet**.  
+
+ResNet50 is a 50-layer deep residual network capable of capturing detailed patterns in images. Due to it's architecture, it achieves high accuracy in classification tasks. In contrast, MobileNet is a more efficient neural network based on **depthwise-separable convolutions**, designed for resource limited environments. Since speed is crucial for real-time license plate detection, we compared the performance of these two backbones.  
+
+Our Faster R-CNN models were implemented using **PyTorch** and the code is available in [fasterrcnn_train.ipynb](src/fasterrcnn/fasterrcnn_train.ipynb). We replaced the default backbone in PyTorchs Faster R-CNN classifier with our selected backbones. Both object detectors were fine-tuned using a **pretrained COCO-weighted backbone**. For training, we used the following **optimizer** and **learning rate scheduler**:  
+
+```python
+optimizer = torch.optim.SGD(params, lr=0.002, momentum=0.9, weight_decay=0.0001)
+lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+```
+
+We selected these parameters to avoid catastrophic forgetting and for the following reasons:
+- **SGD with momentum**: This stabilizes the weight updates and accelerates convergence by incorporating previous gradients into the current step.
+- **Weight decay**: This regularization technique helps prevent overfitting by penalizing excessively large weights, promoting model generalization.
+- **Cosine Annealing Learning Rate**: This scheduler reduces the learning rate gradually following a cosine curve, which helps the model converge smoothly and avoids sudden performance drops, improving overall generalization.
+
+Both models require bounding box annotations in **xyxy format**, for this we developed a [conversion helper script](src/utils/conversion_helpers.py). This script is invoked within the `__getitem__` method of our `LicensePlateDataset` class, which is defined in [pytorch_helper.py](src/utils/pytorch_helper.py). Additionally, this helper file includes:
+- A **training function** to train the model for one epoch.
+- A **predictor function** to make predictions with the trained model.
+
+When training the models ResNet50 required more GPU memory, so we trained it only with a batch size of 5, while MobileNet was trained with a batch size of 10. After two epochs on our dataset, the models achieved the following performance:  
+
+| Model         | mAP50  | mAP50-95 | Training Time (per batch)                          |
+|---------------|--------|----------|----------------------------------------------------|
+| **ResNet50**  | 0.9268 | 0.6613   | ~2h                                                |
+| **MobileNet** | 0.8997 | 0.6668   | ~1h                                                |
+
+Both models plateaued in performance after two epochs.
+
+
 #### YOLO
+*[Resource](https://www.v7labs.com/blog/yolo-object-detection)*
+
+YOLO is a real-time object detection algorithm that processes an entire image in a single forward pass through a neural network, achieving high-speed detection.
+
+**Working Principle:**
+1. **Grid-based Detection:** The image is divided into a grid and each cell predicts bounding boxes and class probabilities.
+2. **Single Neural Network:** Unlike two-stage detectors like Faster R-CNN, YOLO directly predicts bounding boxes and class labels.
+3. **Anchor Boxes:** Predefined anchor boxes improve detection performance for objects of varying sizes.
+4. **Non-Maximum Suppression (NMS):** NMS removes overlapping detections to retain the most accurate predictions.
+
+YOLO offers a balance between speed and accuracy, making it suitable for real-time applications. Which makes it ideal for real-time license plate detection.
+
+For our implementation, we used the [Ultralytics library](https://github.com/ultralytics/ultralytics), which includes models up to YOLOv11. According to the library's documentation, YOLOv11 is the latest model and achieves the best mAP50-95 score on the COCO dataset.  
+![Yolo Comparison](documentation/yolo_comparison.png)
+
+Given that the performance improvement from YOLOv11n to YOLOv11s is the most significant, we chose to use YOLOv11s architecture and weights. This version also has the advantage of being considerably smaller than the other models.  
+![Yolo Sizes](documentation/yolo_sizes.png)
+
+The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for approximately 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
+
+
 #### DETR
+*[Resource1](https://huggingface.co/docs/transformers/model_doc/detr)*
+*[Resource2](https://github.com/facebookresearch/detr)*
+
+Detection Transformer (DETR) is an end-to-end object detection model based on transformers. It eliminates the need for manually designed anchor boxes and uses self-attention mechanisms for object detection.  
+![DETR](documentation/DETR.png)
+
+**Working Principle:**
+1. **Feature Extraction:** A CNN extracts features from the input image.
+2. **Transformer Encoder-Decoder:** The extracted features are processed by a transformer model to generate object queries.
+3. **Prediction Heads:** The transformer outputs class labels and bounding boxes directly.
+4. **Set-based Loss Function:** DETR uses a bipartite matching loss to assign predictions to ground truth objects, improving detection performance.
+
+DETR simplifies object detection pipelines but requires substantial training data and computational power.
+
+For DETRs it is also possible to use different backbones, such as ResNet50 and MobileNet. We implemented a DETR model in `src/detr/detr_train.ipynb`. After training the model with pre-trained COCO weights on a small batch of our training data and testing it, we found that all the predictions were completely incorrect. This suggests a potential bug in our implementation. We suspect the issue could be related to the hyperparameters, like the optimizer, learning rate or in the model itself. Alternatively, it might come from a bug in the `LicensePlateDataset` in the [PyTorch helper](src/utils/pytorch_helper.py), since DETR uses a different target input format (which we implemented) than to the Faster R-CNN.
+
+However, rather than continuing to invest time in debugging DETR, we have decided that training a model slower than our current ResNet50 and YOLOv11 models, which would likely only provide marginal improvements in accuracy, is not a productive use of resources. As a result, we have shifted our focus away from DETR and will not include it in our evaluation.
+
+
 ### Object Tracking
-Deepsort
+Object tracking is the process of following detected objects across multiple frames in a video sequence. In this project, tracking is used to maintain consistent identification of license plates across frames.  
+We use DeepSORT (Simple Online and Realtime Tracker with Deep Learning), which is an advanced object tracking algorithm that builds upon SORT by incorporating deep appearance features.
+
+**Working Principle:**
+1. **Detection-Based Tracking:** DeepSORT uses object detections from an external detector (e.g., YOLO or Faster R-CNN) to initialize and update tracks.
+2. **Kalman Filtering:** A Kalman filter predicts the object's future position based on previous detections.
+3. **Hungarian Algorithm for Data Association:** The Hungarian algorithm associates new detections with existing tracks by minimizing the distance between predicted and detected bounding boxes.
+4. **Deep Appearance Embeddings:** A deep neural network extracts appearance features, improving robustness to occlusions and re-identifications.
+
+DeepSORT offers a good trade-off between accuracy and computational efficiency, making it suitable for real-time tracking applications.
+
+The deepsort implementation we use comes from the library [deep-sort-realtime](https://github.com/levan92/deep_sort_realtime).
+We use deepsort in the generate_evaluation_video function of the [evaluation helpers](src/utils/evaluation_helper.py).
+As already mentioned int the related work chapter we wont compare deepsort to other tracking algorithms and just used it to keep track of different license plates as easyocr often predicted different results for the same license plate.
+
+The DeepSORT implementation we use is from the [deep-sort-realtime](https://github.com/levan92/deep_sort_realtime) library. We use DeepSORT in the `generate_evaluation_video` function within the [evaluation helpers](src/utils/evaluation_helper.py). As mentioned in the related work chapter, we won't compare DeepSORT to other tracking algorithms. Instead, we use it only to keep track of different license plates, because EasyOCR often produced varying predictions for the same license plate.
+
+### OCR
+*[Resouce](https://www.ibm.com/think/topics/optical-character-recognition)*
+
+Optical Character Recognition (OCR) is a technology that allows for the recognition and conversion of text from images into machine-readable formats. It is widely used for tasks like digitizing scanned documents, recognizing text in images and extracting data from various visual formats. In this project, OCR is applied to detect and extract license plate numbers from images.
+
+We use the [EasyOCR library](https://github.com/JaidedAI/EasyOCR) for OCR in our application. EasyOCR uses CNNs to recognize text from images, making it efficient and effective for a variety of text recognition tasks.
+
+In our implementation, we used EasyOCR directly without any fine-tuning or customization. We leveraged the pre-existing models that come with the library for license plate recognition. While EasyOCR performs reasonably well in many scenarios, the results for license plate recognition were not as accurate as we hoped. Several factors, such as image quality, angle and lighting conditions, contributed to the inconsistencies in detection.
+
 
 ## Evaluation
 
-### Metrics
+### Object Detection
+
+#### Metrics
 - beschreibe die verschiedenen metriken, die ich zu evaluation verwendet habe
 
-### Object Detection Results
 
 Show evaluation of different models.
 
-### Performance 
+### License Plate Recognition Pipeline
+show model applied on final video
+#### OCR
+
+#### Performance 
+- show video
+
 
 
 ## Conclusion
-show model applied on final video
-
-
-
-# Notes:
-## Training
-
-YOLO Training ~2h over all data, optimized perfectly everything intern
-FasterRCNN (mobilenet ~2h, resnet ~4h) over all data, you need to optimize everything yourself with pytorch
