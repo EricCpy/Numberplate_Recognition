@@ -1,6 +1,7 @@
 # License Plate Recognition
 **Group Members: Eric Jonas**
 
+
 ## Problem
 The ability to recognize vehicle license plates offers significant advantages across various domains, such as traffic management, parking automation and law enforcement. This project aims to develop a system capable of detecting and recognizing license plates in images and videos. The system will create bounding boxes around the plates and extract the license plate numbers from designated areas of interest.
 
@@ -23,39 +24,79 @@ For object tracking, **DeepSORT** was chosen over more advanced models. The deci
 
 The goal of this project is **not** to build the best system using the best algorithms from every field. Instead, it focuses on implementing a functional system and evaluating various object tracking algorithms.
 
+
 ## Data
+The models were trained using data from the following sources:
+- **[Kaggle Large Dataset](https://www.kaggle.com/datasets/fareselmenshawii/large-license-plate-dataset/code)**
+  - **Training Set**: This subset contains 25,500 carefully curated images for model training.
+  - **Validation Set**: Comprising 1,000 images, this subset is used for evaluating model performance during the development process.
+  - **Test Set**: The test set includes 400 images, which are reserved for final model evaluation after training.
+
+- **[Kaggle Small Dataset](https://www.kaggle.com/datasets/andrewmvd/car-plate-detection?select=images)**
+  - This dataset includes 433 high-quality images.
+
+
+### Large Dataset
+The **large dataset** was created by merging images from various sources, including websites and other datasets, into a single expansive collection. To increase the diversity of the training data, we applied image augmentations, such as snowflakes and random rotations. The images were then organized into three directories: training, validation, and test sets. This dataset follows the YOLO format for bounding box annotations. YOLO annotations store each object's data using the following five parameters:
+```
+class_id boundingbox_center_x boundingbox_center_y boundingbox_width boundingbox_height
+```
+- **class_id**: Integer representing the class of the object (e.g., license plate).
+- **boundingbox_center_x** and **boundingbox_center_y**: Coordinates of the center of the bounding box, normalized to the image width and height.
+- **boundingbox_width** and **boundingbox_height**: The dimensions of the bounding box, also normalized to the image width and height.
+
+
+### Small Dataset
+The **small dataset** consists of 433 high-quality images, with annotations in VOC format. VOC annotations are stored in XML files and include information about image objects, such as class labels, image size, bounding box coordinates.
+
+
+### Merged Dataset
+Both datasets were combined into a unified dataset for training, validation, and testing. To ensure consistency in annotation formats, we converted the VOC annotations from the smaller dataset into YOLO format using the **[YOLO Format Converter](src/data_processing/yolo_format_converter.ipynb)**.
+
+The YOLO format was chosen because it is natively supported by the Ultralytics YOLO library. Additionally, it was easier to use this format to convert to different bounding box formats, which were necessary for some of our PyTorch models. To manage these formats effectively, we developed a **[custom PyTorch DataClass](src/utils/pytorch_helper.py)**.
+
+For improved data management, we renamed the image files using the dataset name and a corresponding index (**[Rename Script](src/data_processing/rename_yolo_dataset_files.ipynb)**), replacing the previous random-character filenames. This benefited our processing workflow and also minimized potential issues related to inconsistent filename formats.
+
+We decided to keep the dataset split from the large dataset:
+1. **Training Data** – Used to train the model.
+2. **Validation Data** – Used to fine-tune hyperparameters and prevent overfitting by determining the optimal number of training epochs.
+3. **Test Data** – Used for final evaluation after training.
+
+While cross-validation could have been an option, we opted not to implement it due to the extensive training times required, which would have made it impractical us.
+
 
 
 ## Implementation
 
 
-# Implementation
-## Object Detection
-### Edge Detection
-### Fasterrcnn
-### YOLO
-### DETR
 
-## Object Tracking
+### Object Detection
+#### Edge Detection
+#### Fasterrcnn
+#### YOLO
+#### DETR
+### Object Tracking
 Deepsort
 
-# Evaluation
+## Evaluation
 
-## Metrics
+### Metrics
 - beschreibe die verschiedenen metriken, die ich zu evaluation verwendet habe
 
-## Object Detection Results
+### Object Detection Results
 
 Show evaluation of different models.
 
-## Performance 
+### Performance 
 
 
-# Conclusion
+## Conclusion
 show model applied on final video
 
-Notes:
-# Training
+
+
+# Notes:
+## Training
 
 YOLO Training ~2h over all data, optimized perfectly everything intern
 FasterRCNN (mobilenet ~2h, resnet ~4h) over all data, you need to optimize everything yourself with pytorch
