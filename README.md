@@ -84,9 +84,9 @@ The YOLO format was chosen because it is natively supported by the Ultralytics Y
 For improved data management, we renamed the image files using the dataset name and a corresponding index (**[Rename Script](src/data_processing/rename_yolo_dataset_files.ipynb)**), replacing the previous random-character filenames. This benefited our processing workflow and also minimized potential issues related to inconsistent filename formats.
 
 We decided to keep the dataset split from the large dataset:
-1. **Training Data** – Used to train the model.
-2. **Validation Data** – Used to fine-tune hyperparameters and prevent overfitting by determining the optimal number of training epochs.
-3. **Test Data** – Used for final evaluation after training.
+1. **Training Data** - Used to train the model.
+2. **Validation Data** - Used to fine-tune hyperparameters and prevent overfitting by determining the optimal number of training epochs.
+3. **Test Data** - Used for final evaluation after training.
 
 While cross-validation could have been an option, we opted not to implement it due to the extensive training times required, which would have made it impractical us.
 
@@ -164,7 +164,7 @@ When training the models ResNet50 required more GPU memory, so we trained it onl
 | **ResNet50**  | 0.9268 | 0.6613   | ~2h                                                |
 | **MobileNet** | 0.8997 | 0.6668   | ~1h                                                |
 
-Both models plateaued in performance after two epochs.
+Both models plateaued in performance after three epochs.
 
 
 #### YOLO
@@ -187,7 +187,7 @@ Given that the performance improvement from YOLOv11n to YOLOv11s is the most sig
 
 ![Yolo Sizes](documentation/yolo_sizes.png)
 
-The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for approximately 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
+The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
 
 
 #### DETR
