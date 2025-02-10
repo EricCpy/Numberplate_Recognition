@@ -18,7 +18,7 @@ However, many of these videos do not discuss the differences between algorithms 
 
 This led to the goal of testing license plate object detection using multiple models, starting with Faster R-CNNs, comparing them with the latest YOLO model (YOLOv11) and also implementing an detection transformer (DETR).  
 
-Beyond object detection, the project also involves an OCR and an object tracking task. Various research papers explore image preprocessing techniques for achieving optimal OCR results, such as this one specifically for license plates [Comparison of Image Preprocessing Techniques for Vehicle License Plate Recognition Using OCR: Performance and Accuracy Evaluation](https://arxiv.org/abs/2410.13622). However, we chose to stick with EasyOCR and grayscale images, despite this paper indicating a slight decline in performance when using EasyOCR with grayscale images.
+Beyond object detection, the project also involves an OCR and an object tracking task. Various research papers explore image preprocessing techniques for achieving optimal OCR results, such as this one specifically for license plates: [Comparison of Image Preprocessing Techniques for Vehicle License Plate Recognition Using OCR: Performance and Accuracy Evaluation](https://arxiv.org/abs/2410.13622). However, we chose to stick with EasyOCR and grayscale images, despite this paper indicating a slight decline in performance when using EasyOCR with grayscale images.
 
 For object tracking, **DeepSORT** was chosen over more advanced models. The decision was based on specific trade-offs, such as easy integration from existing libraries. Many state-of-the-art models listed in this [benchmark](https://paperswithcode.com/sota/multi-object-tracking-on-mot17) build upon DeepSORT (like StrongSORT), enhancing it in some aspects rather than replacing it entirely.  
 
@@ -78,22 +78,21 @@ Object detection is a computer vision task that involves identifying and locatin
 #### Edge Detection
 Edge detection is a fundamental image processing technique used to highlight structural boundaries within an image. It is often utilized as a preprocessing step in various tasks, but can also help us to extract relevant features without using complex machine learning methods.
 
-As a baseline we build a [pipeline](src/simple_edge_detection.ipynb), which detects license plates by just using image processing and edge/contour detection. In the following we will describe the edge detection task by using the following example image.  
-![Car](documentation/car.jpg)
+As a baseline we build a [pipeline](src/simple_edge_detection.ipynb), which detects license plates by just using image processing and edge/contour detection.
 
 The pipeline works as following:
 
 1. **Convert Image to Grayscale:** Since color information is not essential for edge detection, we convert the image to grayscale, simplifying further processing steps.  
 ![Car Gray](documentation/car_gray.png)
 
-2. **Apply Bilateral Filter:** A bilateral filter is used to reduce noise while preserving edges. Unlike a Gaussian filter, which smooths out edges, the bilateral filter ensures that important structural information remains intact.
+1. **Apply Bilateral Filter:** A bilateral filter is used to reduce noise while preserving edges. Unlike a Gaussian filter, which smooths out edges, the bilateral filter ensures that important structural information remains intact.
 
-3. **Use Canny Edge Detection:** The Canny edge detector identifies edges by detecting areas of rapid intensity change. Notably, Canny edge detection includes an internal Gaussian smoothing step, but we found that applying a bilateral filter beforehand yielded better results and was easier to fine-tune. This step helps in detecting key contours that may correspond to license plates.  
+2. **Use Canny Edge Detection:** The Canny edge detector identifies edges by detecting areas of rapid intensity change. Notably, Canny edge detection includes an internal Gaussian smoothing step, but we found that applying a bilateral filter beforehand yielded better results and was easier to fine-tune. This step helps in detecting key contours that may correspond to license plates.  
 ![Car Canny](documentation/car_canny.png)
 
-4. **Identify Contours and Sort by Size:** Contours are detected using the `cv2.findContours` function. These contours are then sorted by size to focus on the most relevant ones.
+1. **Identify Contours and Sort by Size:** Contours are detected using the `cv2.findContours` function. These contours are then sorted by size to focus on the most relevant ones.
 
-5. **Approximate Contour Shapes:** Contours are approximated into polygonal shapes and filtering is applied based on the number of edges and aspect ratio to locate rectangular regions which look like license plates. 
+2. **Approximate Contour Shapes:** Contours are approximated into polygonal shapes and filtering is applied based on the number of edges and aspect ratio to locate rectangular regions which look like license plates. 
 
 The image below highlights the most suitable license plate region while masking the rest in black.  
 ![License Plate](documentation/license_plate.png)
@@ -106,7 +105,7 @@ While edge detection provides a simple approach to detecting license plates, it 
 
 Faster R-CNN (Region-based Convolutional Neural Network) is an advanced object detection framework that enhances traditional R-CNN models by introducing the Region Proposal Network (RPN). This network efficiently proposes object regions, reducing computational overhead while maintaining high accuracy.
 
-![FasterRCNN Architecture](documentation/frcnn_architecture.jpg.png)
+![FasterRCNN Architecture](documentation/frcnn_architecture.jpg)
 
 **Working Principle:**
 1. **Feature Extraction:** A convolutional neural network (CNN) extracts features from the input image.
@@ -287,21 +286,16 @@ The following table summarizes the performance of three object detection models 
 | **Faster R-CNN MobileNetv3** | 0.7404        | 0.8419     | 442    | 155    | 83     | 0.9549    | 0.7749       |
 | **YOLO**                     | 0.8810        | 0.8324     | 437    | 59     | 88     | 0.9354    | 0.8001       |
 
-The following plots illustrate how precision and recall vary with different confidence thresholds:
-<div style="display: flex; justify-content: space-around; align-items: center;">
-    <div style="text-align: center;">
-        <p><strong>Recall vs. Confidence</strong></p>
-        <img src="documentation/recall_confidence.png" width="300">
-    </div>
-    <div style="text-align: center;">
-        <p><strong>Precision vs. Confidence</strong></p>
-        <img src="documentation/precision_confidence.png" width="300">
-    </div>
-    <div style="text-align: center;">
-        <p><strong>Recall vs. Precision</strong></p>
-        <img src="documentation/recall_precision.png" width="300">
-    </div>
-</div>
+The following plots illustrate how precision and recall vary with different confidence thresholds:  
+
+**Recall vs. Confidence:**  
+![Recall vs Confidence](documentation/recall_confidence.png)
+  
+**Precision vs. Confidence:**  
+![Precision vs Confidence](documentation/precision_confidence.png)
+  
+**Recall vs. Precision:**  
+![Recall vs Precision](documentation/recall_precision.png)
 
 **Faster R-CNN with ResNet50:**
   - **Strengths:**
@@ -326,21 +320,16 @@ The following plots illustrate how precision and recall vary with different conf
 - **Ideal Use Cases:**  Real-time detection scenarios where speed and precision are more critical than detecting every possible object.
 
 Overall, **YOLO** tends to predict many bounding boxes, which are filtered out due to low confidence, leaving a high proportion of accurate predictions. In contrast, the **Faster R-CNN** models generates less bounding boxes but with higher confidence and a greater likelihood of being correct.
-The following example also visualizes this: 
-<div style="display: flex; justify-content: space-around; align-items: center;">
-    <div style="text-align: center;">
-        <p><strong>ResNet50 Example</strong></p>
-        <img src="documentation/resnet_example.png" width="300">
-    </div>
-    <div style="text-align: center;">
-        <p><strong>MobileNetv3 Example</strong></p>
-        <img src="documentation/mobilenet_example.png" width="300">
-    </div>
-    <div style="text-align: center;">
-        <p><strong>YOLO Example</strong></p>
-        <img src="documentation/yolo_example.png" width="300">
-    </div>
-</div>
+The following example also visualizes this:  
+
+**ResNet50 Example**  
+![ResNet50 Example](documentation/resnet_example.png)
+
+**MobileNet v3 Example**  
+![MobileNet v3 Example](documentation/mobilenet_example.png)
+
+**YOLO Example**  
+![YOLO Example](documentation/yolo_example.png)
 
 
 ### License Plate Recognition Pipeline
