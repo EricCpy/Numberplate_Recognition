@@ -68,10 +68,6 @@ While cross-validation could have been an option, we opted not to implement it d
 ## Implementation
 In this chapter, we will provide an overview of the algorithms used, explaining how they function and how we implemented them. We will first describe various object detection strategies before discussing object tracking techniques. All models discussed in this chapter were trained using an NVIDIA GTX 1080 Ti.
 
-
-## Implementation
-In this chapter, I will provide an overview of the algorithms I used, explaining how they function and how I implemented them. I will first describe various object detection strategies and machine learning methods before discussing object tracking techniques.
-
 ### Object Detection
 Object detection is a computer vision task that involves identifying and locating objects within an image or video. Unlike simple classification, which determines what objects are present in an image, object detection provides additional information by drawing bounding boxes around detected objects. For example, in our applications, object detection can identify license plates and locate where they are in the image by providing us with a bounding box. 
 
@@ -162,6 +158,7 @@ For our implementation, we used the [Ultralytics library](https://github.com/ult
 ![Yolo Comparison](documentation/yolo_comparison.png)
 
 Given that the performance improvement from YOLOv11n to YOLOv11s is the most significant, we chose to use YOLOv11s architecture and weights. This version also has the advantage of being considerably smaller than the other models.  
+
 ![Yolo Sizes](documentation/yolo_sizes.png)
 
 The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for approximately 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
@@ -260,16 +257,10 @@ function calculate_confusion_matrix(conf_threshold=0.25, iou_threshold=0.5) -> d
 
 Using these confusion matrix properties, we calculate the following key metrics:  
 
-- **Precision:** The proportion of correctly predicted objects among all detected objects:  
-  $$
-  Precision = \frac{TP}{TP + FP}
-  $$  
+- **Precision:** The proportion of correctly predicted objects among all detected objects: Precision = TP / (TP + FP)  
   A high precision score indicates that the model produces few false positives, meaning it primarily detects relevant objects while minimizing incorrect predictions.  
 
-- **Recall:** The proportion of correctly predicted objects among all actual objects:  
-  $$
-  Recall = \frac{TP}{TP + FN}
-  $$  
+- **Recall:** The proportion of correctly predicted objects among all actual objects: Recall = TP / (TP + FN)  
   A high recall score signifies that the model successfully detects most of the actual objects, with minimal missed detections.  
 
 - **mAP50:** The Mean Average Precision at an IOU threshold of 50%. A prediction is considered correct if its IOU with the ground truth is at least 0.5. The mAP50 score is calculated by averaging the Average Precision (AP) across all object classes at this threshold. This involves iterating over all classes and computing precision at various confidence levels, taking the mean precision for each class and then averaging across all classes.  
