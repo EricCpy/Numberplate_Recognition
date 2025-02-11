@@ -26,6 +26,7 @@
       - [Model Comparison](#model-comparison)
     - [Video Demonstration](#video-demonstration)
   - [Conclusion](#conclusion)
+  - [References](#references)
 
 
 ## Problem
@@ -53,12 +54,12 @@ The goal of this project is **not** to build the best system using the best algo
 
 ## Data
 The models were trained using data from the following sources:
-- **[Kaggle Large Dataset](https://www.kaggle.com/datasets/fareselmenshawii/large-license-plate-dataset/code)**
+- **[Kaggle Large Dataset](https://www.kaggle.com/datasets/fareselmenshawii/large-license-plate-dataset)**
   - **Training Set**: This subset contains 25,500 carefully curated images for model training.
   - **Validation Set**: Comprising 1,000 images, this subset is used for evaluating model performance during the development process.
   - **Test Set**: The test set includes 400 images, which are reserved for final model evaluation after training.
 
-- **[Kaggle Small Dataset](https://www.kaggle.com/datasets/andrewmvd/car-plate-detection?select=images)**
+- **[Kaggle Small Dataset](https://www.kaggle.com/datasets/andrewmvd/car-plate-detection)**
   - This dataset includes 433 high-quality images.
 
 
@@ -374,3 +375,13 @@ This project explored various approaches to license plate recognition by impleme
 We found that Faster R-CNN with a ResNet50 backbone yielded the highest recall and mAP50 scores, making it the most effective model for accurate license plate detection among those tested. On the other hand, Yolov11 provided a strong balance between precision, speed and recall, making it the most practical option for real-time applications. While MobileNetV3 offered efficiency, its performance was inferior to both Faster R-CNN and YOLOv11. For object tracking, DeepSORT demonstrated its effectiveness by consistently maintaining accurate license plate identification across frames. OCR performance remained a challenge, as easyOCR struggled to reliably predict the same text for a plate across different frames.
 
 Overall, this project provided insights into object detection, tracking, and OCR for license plate recognition. While each approach had its trade-offs, combining YOLOv11 for detection and DeepSORT for tracking offered the best balance. Further refinements in OCR and dataset curation could improve the robustness and reliability of such a system in practical deployment scenarios.
+
+## References
+1. Papers with Code. (n.d.). *Object detection on COCO*. Papers with Code. Retrieved from https://paperswithcode.com/sota/object-detection-on-coco
+2. Sun, Y., Sun, Z., & Chen, W. (2024). The evolution of object detection methods. *Computers in Industry, 156*, 107078. https://doi.org/10.1016/j.compind.2024.107078
+3. Tavares, R. A. (2024). Comparison of image preprocessing techniques for vehicle license plate recognition using OCR: Performance and accuracy evaluation. https://arxiv.org/abs/2410.13622
+4. Elmenshawii, F. (2024). *Large-License-Plate-Detection-Dataset*. Kaggle. https://www.kaggle.com/datasets/fareselmenshawii/large-license-plate-datasetlarge-license-plate-dataset/code
+5. Larxel. (2020). *Car license plate detection* Kaggle. https://www.kaggle.com/datasets/andrewmvd/car-plate-detection
+6. Cai, X. (2021, April 1). Understanding Faster R-CNN from the perspective of implementation. Retrieved from https://www.lablab.top/post/how-does-faster-r-cnn-work-part-i/
+7. Kundu, R. (2023). YOLO: Algorithm for object detection explained. *V7 Labs*. Retrieved from https://www.v7labs.com/blog/yolo-object-detection
+8. Hugging Face. (n.d.). *DETR (DEtection TRansformers)*. Retrieved from https://huggingface.co/docs/transformers/model_doc/detr
