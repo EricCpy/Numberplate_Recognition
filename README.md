@@ -89,7 +89,7 @@ We decided to keep the dataset split from the large dataset:
 2. **Validation Data** - Used to fine-tune hyperparameters and prevent overfitting by determining the optimal number of training epochs.
 3. **Test Data** - Used for final evaluation after training.
 
-While cross-validation could have been an option, we opted not to implement it due to the extensive training times required, which would have made it impractical us.
+While cross-validation could have been an option, we opted not to implement it due to the extensive training times required, which would have made it impractical for us.
 
 
 ## Implementation
@@ -158,7 +158,7 @@ Both models require bounding box annotations in **xyxy format**, for this we dev
 - A **training function** to train the model for one epoch.
 - A **predictor function** to make predictions with the trained model.
 
-When training the models ResNet50 required more GPU memory, so we trained it only with a batch size of 5, while MobileNet was trained with a batch size of 10. After two epochs on our dataset, the models achieved the following performance:  
+When training the models ResNet50 required more GPU memory, so we trained it only with a batch size of 5, while MobileNet was trained with a batch size of 10. After two epochs on our dataset, the models achieved the following performance on the validation dataset:  
 
 | Model         | mAP50  | mAP50-95 | Training Time (per batch)                          |
 |---------------|--------|----------|----------------------------------------------------|
@@ -188,7 +188,7 @@ Given that the performance improvement from YOLOv11n to YOLOv11s is the most sig
 
 ![Yolo Sizes](documentation/yolo_sizes.png)
 
-The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
+The code for training the YOLO detector is available in the [conversion helper script](src/yolo/yolo_train.py). We finetuned our YOLO object detector for 10 epochs, using batches of size 32. After 10 epochs, the model plateaued with a mAP50 of 0.8831 and a mAP50-95 of 0.6401 on the validation dataset. Notably, the entire training process took only around 1.5 to 2 hours to complete. The results are slightly worse than those achieved by the faster R-CNN models. However, it's important to note that the YOLO model is much smaller than both of the faster RCNN models we trained.
 
 
 #### DETR
@@ -223,10 +223,6 @@ We use DeepSORT (Simple Online and Realtime Tracker with Deep Learning), which i
 
 DeepSORT offers a good trade-off between accuracy and computational efficiency, making it suitable for real-time tracking applications.
 
-The deepsort implementation we use comes from the library [deep-sort-realtime](https://github.com/levan92/deep_sort_realtime).
-We use deepsort in the generate_evaluation_video function of the [evaluation helpers](src/utils/evaluation_helper.py).
-As already mentioned int the related work chapter we wont compare deepsort to other tracking algorithms and just used it to keep track of different license plates as easyocr often predicted different results for the same license plate.
-
 The DeepSORT implementation we use is from the [deep-sort-realtime](https://github.com/levan92/deep_sort_realtime) library. We use DeepSORT in the `generate_evaluation_video` function within the [evaluation helpers](src/utils/evaluation_helper.py). As mentioned in the related work chapter, we won't compare DeepSORT to other tracking algorithms. Instead, we use it only to keep track of different license plates, because EasyOCR often produced varying predictions for the same license plate.
 
 ### OCR
@@ -252,15 +248,15 @@ This chapter evaluates the object detection methods Faster R-CNN with ResNet50, 
 #### Metrics  
 *[Resource](https://docs.ultralytics.com/guides/yolo-performance-metrics/#results-storage)*
 
-When evaluating object detection models, we can use many of the same metrics as in traditional classification tasks. However, metrics that rely on True Negatives (TN), such as accuracy, are not applicable. Instead, we assess model performance using precision, recall and mean Average Precision (mAP), all of which are based on Intersection over Union (IOU) scores.  
+When evaluating object detection models, we can use many of the same metrics as in traditional classification tasks. However, metrics that rely on True Negatives (TN), such as accuracy, are not applicable. Instead, we assess model performance using precision, recall and mean Average Precision (mAP), all of which are based on Intersection over Union (IoU) scores.  
 
-Object detection predictions can be categorized using a confusion matrix approach or a metric like average IOU:  
-- **True Positives (TP):** A predicted bounding box that correctly overlaps with a ground truth bounding box based on a predefined IOU threshold.  
+Object detection predictions can be categorized using a confusion matrix approach or a metric like average IoU:  
+- **True Positives (TP):** A predicted bounding box that correctly overlaps with a ground truth bounding box based on a predefined IoU threshold.  
 - **False Positives (FP):** A predicted bounding box that does not sufficiently overlap with any ground truth bounding box, indicating an incorrect detection.  
-- **False Negatives (FN):** A ground truth bounding box that has no corresponding prediction with a sufficient IOU, indicating a missed detection.  
+- **False Negatives (FN):** A ground truth bounding box that has no corresponding prediction with a sufficient IoU, indicating a missed detection.  
 - **True Negatives (TN):** A correctly predicted background region that overlaps with the actual background. However, since the number of background bounding boxes is undefined and we do not explicitly predict background regions, True Negatives are typically left undefined in object detection tasks.  
 
-The following pseudo-code illustrates how to compute the confusion matrix based on predicted bounding boxes and their IOU scores with ground truth boxes (a python implmenetation can be found in the [evaluation helper class](src/utils/evaluation_helper.py)):  
+The following pseudo-code illustrates how to compute the confusion matrix based on predicted bounding boxes and their IoU scores with ground truth boxes (a python implmenetation can be found in the [evaluation helper class](src/utils/evaluation_helper.py)):  
 ```plaintext
 dataset = list of our images
 image_predictions = list of our predictions for each image containing (confidence, label, iou)
@@ -288,13 +284,13 @@ Using these confusion matrix properties, we calculate the following key metrics:
 - **Recall:** The proportion of correctly predicted objects among all actual objects: Recall = TP / (TP + FN)  
   A high recall score signifies that the model successfully detects most of the actual objects, with minimal missed detections.  
 
-- **mAP50:** The Mean Average Precision at an IOU threshold of 50%. A prediction is considered correct if its IOU with the ground truth is at least 0.5. The mAP50 score is calculated by averaging the Average Precision (AP) across all object classes at this threshold. This involves iterating over all classes and computing precision at various confidence levels, taking the mean precision for each class and then averaging across all classes.  
+- **mAP50:** The Mean Average Precision at an IOU threshold of 50%. A prediction is considered correct if its IOU with the ground truth is at least 0.5. The mAP50 score is calculated by averaging the Average Precision (AP) across all object classes. This involves iterating over all classes and computing precision at various confidence levels, taking the mean precision for each class and then averaging across all classes.  
 
-- **mAP50-95:** This metric extends mAP50 by computing AP over multiple IOU thresholds, ranging from 0.5 to 0.95 in 0.05 increments. It provides a more comprehensive evaluation of model performance across different levels of overlaps. A higher mAP50-95 score indicates that the model consistently delivers accurate predictions across varying IOU thresholds.  
+- **mAP50-95:** This metric extends mAP50 by computing AP over multiple IOU thresholds, ranging from 0.5 to 0.95 in 0.05 increments. It provides a more comprehensive evaluation of model performance across different levels of overlaps. A higher mAP50-95 score indicates that the model consistently delivers accurate predictions across varying IoU thresholds.  
 
 #### Model Comparison
 
-The following table summarizes the performance of three object detection models evaluated with a **minimum confidence threshold of 0.25** and a **minimum IoU of 0.5**. Note that the total number of detections (TP + FP + FN) differs among models because low-confidence predictions are discarded. For example, YOLO tends to generate more low-confidence predictions than the other models.
+The following table summarizes the performance of the three object detection models evaluated with a **minimum confidence threshold of 0.25** and a **minimum IoU of 0.5**. Note that the total number of detections (TP + FP + FN) differs among models because low-confidence predictions are discarded. For example, YOLO tends to generate more low-confidence predictions than the other models.
 
 | **Model**                    | **Precision** | **Recall** | **TP** | **FP** | **FN** | **mAP50** | **mAP50-95** |
 |------------------------------|---------------|------------|--------|--------|--------|-----------|--------------|
@@ -363,16 +359,16 @@ To analyze this video, we evaluated the processing time required for each frame 
 | **MobileNetV3 Faster R-CNN** | 0.21 seconds                          | 20.55                                                                  |
 | **YOLOv11**                  | 0.13 seconds                          | 42.56                                                                  |
 
-The results show that our MobileNetV3 Faster R-CNN is slower than YOLOv11. Furthermore, when analyzing the consistency of OCR predictions, YOLOv11 generated a higher average number of different plate predictions per tracking target, while MobileNetv3 produced less than half of YOLO's predictions. This difference occurs because MobileNetv3 tends to predict fewer plates and over shorter timeframes. This means MobileNet focuses on larger and more readable plates over smaller ones, which YOLO also detects at detecting.
+The results show that our MobileNetV3 Faster R-CNN is slower than YOLOv11. Furthermore, when analyzing the consistency of OCR predictions, YOLOv11 generated a higher average number of different plate predictions per tracking target, while MobileNetv3 produced less than half of YOLO's predictions. This difference occurs because MobileNetv3 tends to predict fewer plates and over shorter timeframes. This means MobileNet focuses on larger and more readable plates over smaller ones.
 
-The frequent changes in plate predictions suggest there is significant room for improvement in the OCR technique. For instance, if we had a fixed camera setup for the video, we could identify the optimal spot where the license plate is most clearly visible, potentially increasing accuracy. We could also throw away license plate predictions which dont equal the license plate pattern for a country.
+The frequent changes in plate predictions suggest there is significant room for improvement in the OCR technique. For instance, with a fixed camera setup, we could identify the optimal spot where the license plate is most clearly visible, potentially increasing accuracy. We could also throw away OCR predictions which dont equal our license plate pattern.
 
 The frequent changes in plate predictions indicate potential for improving the OCR technique. For example, with a fixed camera setup, we could identify the optimal position where the license plate is most clearly visible, which could enhance our accuracy. Additionally, we could filter out license plate predictions that do not match the expected pattern.
 
 ## Conclusion
 This project explored various approaches to license plate recognition by implementing and comparing multiple object detection models. Rather than focusing solely on developing a production-ready system, the primary goal was to assess the strengths and weaknesses of different detection techniques.
 
-We found that Faster R-CNN with a ResNet50 backbone yielded the highest recall and mAP50 scores, making it the most effective model for accurate license plate detection among those tested. On the other hand, Yolov11 provided a strong balance between precision, speed and recall, making it the most practical option for real-time applications. While MobileNetV3 offered efficiency, its performance was inferior to both Faster R-CNN and YOLOv11. For object tracking, DeepSORT demonstrated its effectiveness by consistently maintaining accurate license plate identification across frames. OCR performance remained a challenge, as easyOCR struggled to reliably predict the same text for a plate across different frames.
+We found that Faster R-CNN with a ResNet50 backbone yielded the highest recall and mAP50 scores, making it the most effective model for accurate license plate detection among those tested. On the other hand, Yolov11 provided a strong balance between precision, speed and recall, making it the most practical option for real-time applications. While MobileNetV3 offered efficiency, its accuracy was inferior to both Faster R-CNN and YOLOv11. For object tracking, DeepSORT demonstrated its effectiveness by consistently maintaining accurate license plate identification across frames. OCR performance remained a challenge, as easyOCR struggled to reliably predict the same text for a plate across different frames.
 
 Overall, this project provided insights into object detection, tracking, and OCR for license plate recognition. While each approach had its trade-offs, combining YOLOv11 for detection and DeepSORT for tracking offered the best balance. Further refinements in OCR and dataset curation could improve the robustness and reliability of such a system in practical deployment scenarios.
 
